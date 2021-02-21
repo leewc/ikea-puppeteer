@@ -1,0 +1,16 @@
+{
+  "name": "puppeteer-ikea-add-to-cart",
+  "version": "1.0.0",
+  "description": "A puppeteer script that adds product pages to cart with email notification if in-stock",
+  "main": "ikea.js",
+  "dependencies": {
+    "nodemailer": "^6.4.16",
+    "puppeteer": "^5.5.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "leewc",
+  "license": "ISC"
+}
