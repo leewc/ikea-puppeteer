@@ -12,12 +12,12 @@ const util = require('util');
 
 const DEBUG = true;
 const DETAIL_PAGE_LINKS = [
-  // 'https://www.ikea.com/us/en/p/stockholm-mirror-walnut-veneer-60249960/', //test: in-stock item
+  // 'https://www.ikea.com/us/en/p/symfonisk-wifi-bookshelf-speaker-white-80435211/', //test: in-stock item
   'https://www.ikea.com/us/en/p/lidhult-sofa-with-chaise-gassebol-light-beige-s59257159/', //out of stock
   // 'https://www.ikea.com/us/en/p/pax-wardrobe-frame-white-50214560/'
 ];
 const DELIVERY_ZIP_CODE = '98109';
-const INTERVAL_IN_MINUTES = 0.5;
+const INTERVAL_IN_MINUTES = 30;
 
 // Generate a Gmail app password (so you do not use your real password)
 // https://nodemailer.com/usage/using-gmail/
@@ -69,8 +69,10 @@ async function main() {
 main()
 
 const sendNotificationByEmail = (transporter, inStockLinks) => {
-  let messageBody = MAIL_DETAILS['beginningText'] + inStockLinks.concat("\n\t");
-  transporter.sendMail(messageBody, function(error, info){
+  // make a deep copy so we don't dirty state across runs. This would be better off a function but I wanted to keep MAIL_DETAILS moveable to config, since it's well, config.
+  let sendMailDetails = JSON.parse(JSON.stringify(MAIL_DETAILS));
+  sendMailDetails['beginningText'] += inStockLinks.concat("\n\t");
+  transporter.sendMail(sendMailDetails, function(error, info){
     if (error) {
     console.log(error);
     } else {
@@ -104,29 +106,13 @@ const inStock = async (detailPageLinks) => {
     const navigationPromise = page.waitForNavigation()
   
     for (const detailPageLink of detailPageLinks) {
-      await page.goto(detailPageLink, {waitUntil: 'networkidle0'}) //todo talk about why https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options
+      await page.goto(detailPageLink, {waitUntil: 'networkidle0'})
       await navigationPromise
       await addToCart(page, detailPageLink)
     }
   
     console.log("All items added, checking out ....")
     await beginCheckout(page, DELIVERY_ZIP_CODE)
-  
-    // Here we do this unwieldly try-catch as we're not sure if the selector exists, we could wait for 'networkIdle' and try to use $ selector instead of a timeout, but that's not much better. Downside here is waiting 5 seconds regardless if item is in stock or not.
-    // IKEA currently throws '500 server error' from ingka.com if all items are Out of Stock, if some of them are in-stock 'cannot add item to list'
-    try {
-      // There is a timing issue in which the 'toast' will pop up but Puppeteer gives up waiting, as such as must slowdown for it.
-      // Alternatively, do not wait for this and instead just check if there is stock (i.e able to select 'home-delivery')
-      await page.waitForSelector('.Toastify__toast-container > .Toastify__toast--error > .button', {visible: true});
-      await page.click('.Toastify__toast-container > .Toastify__toast--error > .button', {visible: true})
-      // await page.waitForSelector('#one-checkout > .Toastify__toast-container > .Toastify__toast--error > .button', {visible: true, timeout: 5000});
-      // await page.click('#one-checkout > div.Toastify > div > div > button')
-      console.log("Out of stock :(");
-      await browser.close()
-      return;
-    } catch(error) {
-      console.log('Error Element not present, trying something else. ' + error)
-    }
 
     try {
       // Wait for backend network calls, we add a timeout, lack of it means element not present = out of stock
@@ -143,7 +129,13 @@ const inStock = async (detailPageLinks) => {
     try {
       // We have stock!
       await page.waitForSelector('.homedelivery #REGULAR', {timeout: 5000});
-      await page.click('.homedelivery #REGULAR')
+
+      await page.waitForSelector('.choice-item__nested > .deliveryarrangements > .deliveryarrangement > .calendar > .calendar__toggle-text')
+      await page.click('.choice-item__nested > .deliveryarrangements > .deliveryarrangement > .calendar > .calendar__toggle-text')
+
+      await page.waitForSelector('#flow-start > .checkout-section-sleeve > .delivery__submit > .btn > .btn__inner')
+      await page.click('#flow-start > .checkout-section-sleeve > .delivery__submit > .btn > .btn__inner')
+
       console.log("!!!!!! All Items are available !!!!!!");
       await browser.close()
 
@@ -154,7 +146,7 @@ const inStock = async (detailPageLinks) => {
       console.log('No home delivery element present.')
     }
     
-    console.log("Unknown case.")   // throw an exception?
+    console.log("Item is OOS or Unknown case.")   // throw an exception?
     await browser.close()
     console.log("All done. Exiting ... ")
     return;
@@ -205,11 +197,11 @@ async function beginCheckout(page, deliveryZipCode) {
     await page.click('.shoppingbag__headline > .checkout__wrapper > button')
 
     await navigationPromise
-    await page.waitForSelector('.zipin #zipcode')
-    await page.click('.zipin #zipcode')
+    await page.waitForSelector('.zipin-input #zipcode')
+    await page.click('.zipin-input #zipcode')
     await page.type('.zipin #zipcode', deliveryZipCode)
-  
-    await page.waitForSelector('.zipin > form > .\_Rfx6_ > .button > .button__text')
-    await page.click('.zipin > form > .\_Rfx6_ > .button > .button__text')
+
+    await page.waitForSelector('.zipin > form > .\_Rfx7_ > .btn > .btn__inner')
+    await page.click('.zipin > form > .\_Rfx7_ > .btn > .btn__inner')
   })();
 }
