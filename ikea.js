@@ -201,7 +201,14 @@ async function beginCheckout(page, deliveryZipCode) {
     await page.click('.zipin-input #zipcode')
     await page.type('.zipin #zipcode', deliveryZipCode)
 
-    await page.waitForSelector('.zipin > form > .\_Rfx7_ > .btn > .btn__inner')
-    await page.click('.zipin > form > .\_Rfx7_ > .btn > .btn__inner')
+    // This can change, and will break, need to improve the heuristic since I see different versions of checkout.
+    try {
+		await page.waitForSelector('.zipin > form > .\_Rfx5_ > .btn > .btn__inner')
+		await page.click('.zipin > form > .\_Rfx5_ > .btn > .btn__inner')
+    } catch {
+		//another version of checkout
+		await page.waitForSelector('.zipin > form > .\_Rfx7_ > .btn > .btn__inner')
+		await page.click('.zipin > form > .\_Rfx7_ > .btn > .btn__inner')
+    }
   })();
 }
